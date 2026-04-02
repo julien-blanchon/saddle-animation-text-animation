@@ -43,8 +43,9 @@ fn plugin_initializes_for_ui_and_world_text() {
         TextLayoutInfo::default(),
         ComputedNode::default(),
         TextAnimationBundle {
-            config: TextAnimationConfig::typewriter(20.0)
-                .with_effect(saddle_animation_text_animation::TextEffect::Wave(WaveEffect::default())),
+            config: TextAnimationConfig::typewriter(20.0).with_effect(
+                saddle_animation_text_animation::TextEffect::Wave(WaveEffect::default()),
+            ),
             ..TextAnimationBundle::default()
         },
     ));

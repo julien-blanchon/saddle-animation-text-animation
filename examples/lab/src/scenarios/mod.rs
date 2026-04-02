@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use saddle_bevy_e2e::{action::Action, actions::assertions, scenario::Scenario};
 use saddle_animation_text_animation::TextAnimationAction;
+use saddle_bevy_e2e::{action::Action, actions::assertions, scenario::Scenario};
 
 use crate::{LabDiagnostics, send_command_to_named, set_reduced_motion};
 
