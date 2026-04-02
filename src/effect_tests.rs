@@ -51,7 +51,7 @@ fn shake_is_deterministic_for_same_seed() {
     let mut second = GlyphVisual::new(Color::WHITE);
     apply_effects(
         &mut first,
-        &[effect.clone()],
+        std::slice::from_ref(&effect),
         &glyph,
         &grapheme,
         0.75,
