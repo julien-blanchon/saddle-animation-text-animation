@@ -1,0 +1,13 @@
+[package]
+name = "saddle-animation-text-animation-example-stress"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { workspace = true }
+saddle-animation-text-animation = { workspace = true }
+saddle-animation-text-animation-example-common = { path = "../common" }
+
+[lints]
+workspace = true

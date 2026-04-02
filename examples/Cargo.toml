@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "common",
+    "basic",
+    "typewriter",
+    "layered_effects",
+    "reduced_motion",
+    "text2d_world_label",
+    "stress",
+    "lab",
+]
+resolver = "3"
+
+[workspace.dependencies]
+bevy = { version = "0.18", features = ["serialize", "debug"] }
+saddle-animation-text-animation = { path = ".." }
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"
