@@ -7,12 +7,14 @@ use bevy::prelude::*;
 use bevy::sprite::Text2dShadow;
 #[cfg(feature = "dev")]
 use bevy_brp_extras::BrpExtrasPlugin;
+use saddle_animation_text_animation_example_common::install_demo_pane;
 use saddle_animation_text_animation::{
     AlphaPulseEffect, RainbowEffect, ShakeEffect, TextAnimationAccessibility, TextAnimationAction,
     TextAnimationBundle, TextAnimationCommand, TextAnimationCompleted, TextAnimationConfig,
     TextAnimationController, TextAnimationDebugState, TextAnimationLoopFinished,
-    TextAnimationPlugin, TextAnimationStarted, TextEffect, TextMotionPreference,
-    TextRevealCheckpoint, TypewriterConfig, WaveEffect,
+    TextAnimationMarkup, TextAnimationPlugin, TextAnimationStarted, TextEffect,
+    TextMotionPreference, TextRevealCheckpoint, TextRevealSound, TextRevealSoundRequested,
+    TypewriterConfig, WaveEffect,
 };
 
 const DEFAULT_BRPP_PORT: u16 = 15_742;
@@ -27,8 +29,10 @@ pub struct LabDiagnostics {
     pub completed_count: usize,
     pub loop_count: usize,
     pub checkpoint_count: usize,
+    pub sound_request_count: usize,
     pub dialogue_visible_units: usize,
     pub dialogue_total_units: usize,
+    pub dialogue_effect_count: usize,
     pub unicode_visible_units: usize,
     pub unicode_total_units: usize,
     pub world_visible_graphemes: usize,
@@ -37,6 +41,7 @@ pub struct LabDiagnostics {
     pub reduced_motion: bool,
     pub last_completed_name: Option<String>,
     pub last_checkpoint_name: Option<String>,
+    pub last_sound_cue: Option<String>,
 }
 
 fn main() {
@@ -52,6 +57,7 @@ fn main() {
         }),
         ..default()
     }));
+    install_demo_pane(&mut app);
     #[cfg(feature = "dev")]
     app.add_plugins(BrpExtrasPlugin::with_port(lab_brp_port()));
     #[cfg(feature = "e2e")]
@@ -65,6 +71,7 @@ fn main() {
             record_completed_messages,
             record_loop_messages,
             record_checkpoint_messages,
+            record_sound_messages,
             refresh_diagnostics,
             update_overlay,
         ),
@@ -157,12 +164,17 @@ fn setup(mut commands: Commands) {
         ));
         parent.spawn((
             Name::new("Dialogue Typewriter"),
-            Text::new(
-                "Docking lane seven is still occupied. Hold position, wait for the clearance ping, then proceed at low speed.",
-            ),
+            Text::new(""),
             demo_font(26.0),
             TextColor(Color::WHITE),
             TextShadow::default(),
+            TextAnimationMarkup::single(
+                "<wave>Docking lane seven</wave> is still occupied. Hold position, wait for the <shake>clearance ping</shake>, then proceed at <scale>low speed</scale>.",
+            ),
+            TextRevealSound {
+                cue_id: "lab.dialogue.blip".into(),
+                ..default()
+            },
             TextAnimationBundle {
                 config: TextAnimationConfig::typewriter(12.0).with_effect(TextEffect::Wave(
                     WaveEffect {
@@ -378,6 +390,16 @@ fn record_checkpoint_messages(
     }
 }
 
+fn record_sound_messages(
+    mut events: MessageReader<TextRevealSoundRequested>,
+    mut diagnostics: ResMut<LabDiagnostics>,
+) {
+    for event in events.read() {
+        diagnostics.sound_request_count += 1;
+        diagnostics.last_sound_cue = Some(event.cue_id.clone());
+    }
+}
+
 fn refresh_diagnostics(
     accessibility: Res<TextAnimationAccessibility>,
     mut diagnostics: ResMut<LabDiagnostics>,
@@ -391,6 +413,7 @@ fn refresh_diagnostics(
         if name == "Dialogue Typewriter" {
             diagnostics.dialogue_visible_units = debug.revealed_units;
             diagnostics.dialogue_total_units = debug.total_units;
+            diagnostics.dialogue_effect_count = debug.effect_count;
         } else if name == "Unicode Sample" {
             diagnostics.unicode_visible_units = debug.revealed_units;
             diagnostics.unicode_total_units = debug.total_units;
@@ -417,13 +440,16 @@ fn update_overlay(
     };
 
     **text = format!(
-        "dialogue {}/{} | unicode {}/{} | completed {} | checkpoints {} | reduced_motion {} | stress_labels {} | last_completed {:?}",
+        "dialogue {}/{} fx={} | unicode {}/{} | completed {} | checkpoints {} | sound_requests {} {:?} | reduced_motion {} | stress_labels {} | last_completed {:?}",
         diagnostics.dialogue_visible_units,
         diagnostics.dialogue_total_units,
+        diagnostics.dialogue_effect_count,
         diagnostics.unicode_visible_units,
         diagnostics.unicode_total_units,
         diagnostics.completed_count,
         diagnostics.checkpoint_count,
+        diagnostics.sound_request_count,
+        diagnostics.last_sound_cue,
         diagnostics.reduced_motion,
         diagnostics.stress_label_count,
         diagnostics.last_completed_name,

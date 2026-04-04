@@ -3,8 +3,8 @@ use bevy::math::Vec2;
 use bevy::prelude::*;
 
 use crate::config::{
-    AlphaPulseEffect, EffectEnvelope, RainbowEffect, ShakeEffect, TextEffect, TextEnvelopeEasing,
-    TextRangeSelector, WaveEffect,
+    AlphaPulseEffect, EffectEnvelope, RainbowEffect, ScaleEffect, ShakeEffect, TextEffect,
+    TextEnvelopeEasing, TextRangeSelector, WaveEffect,
 };
 use crate::glyph_cache::{GlyphEntry, GraphemeEntry};
 
@@ -13,6 +13,7 @@ pub(crate) struct GlyphVisual {
     pub offset: Vec2,
     pub color: LinearRgba,
     pub alpha: f32,
+    pub scale: Vec2,
 }
 
 impl GlyphVisual {
@@ -21,13 +22,14 @@ impl GlyphVisual {
             offset: Vec2::ZERO,
             color: LinearRgba::from(base_color),
             alpha: 1.0,
+            scale: Vec2::ONE,
         }
     }
 }
 
-pub(crate) fn apply_effects(
+pub(crate) fn apply_effects<'a>(
     visual: &mut GlyphVisual,
-    effects: &[TextEffect],
+    effects: impl IntoIterator<Item = &'a TextEffect>,
     glyph: &GlyphEntry,
     grapheme: &GraphemeEntry,
     elapsed_secs: f32,
@@ -94,6 +96,18 @@ pub(crate) fn apply_effects(
                 }
                 let pulse = alpha_pulse(config, glyph, elapsed_secs);
                 visual.alpha *= pulse.powf(intensity.max(0.001));
+            }
+            TextEffect::Scale(config) => {
+                if !matches_range(config.range, grapheme) {
+                    continue;
+                }
+                let intensity = envelope_factor(&config.envelope, elapsed_secs);
+                if intensity <= 0.0 {
+                    continue;
+                }
+                let scale = scale_pulse(config, glyph, elapsed_secs);
+                let blended_scale = 1.0 + (scale - 1.0) * intensity;
+                visual.scale *= Vec2::splat(blended_scale.max(0.001));
             }
         }
     }
@@ -175,6 +189,12 @@ fn alpha_pulse(config: &AlphaPulseEffect, glyph: &GlyphEntry, elapsed_secs: f32)
     let phase = elapsed_secs * config.speed + glyph.primary_index as f32 * config.phase_offset;
     let t = (phase.sin() + 1.0) * 0.5;
     config.min_alpha + (config.max_alpha - config.min_alpha) * t
+}
+
+fn scale_pulse(config: &ScaleEffect, glyph: &GlyphEntry, elapsed_secs: f32) -> f32 {
+    let phase = elapsed_secs * config.speed + glyph.primary_index as f32 * config.phase_offset;
+    let t = (phase.sin() + 1.0) * 0.5;
+    config.min_scale + (config.max_scale - config.min_scale) * t
 }
 
 fn ease(value: f32, easing: TextEnvelopeEasing) -> f32 {

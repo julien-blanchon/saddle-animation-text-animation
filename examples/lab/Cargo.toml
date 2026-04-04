@@ -12,6 +12,8 @@ e2e = ["dep:saddle-bevy-e2e"]
 [dependencies]
 bevy = { version = "0.18", features = ["bevy_remote", "serialize"] }
 saddle-animation-text-animation = { workspace = true }
+saddle-animation-text-animation-example-common = { path = "../common" }
+saddle-pane = { workspace = true }
 bevy_brp_extras = { version = "0.19", optional = true }
 saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", features = ["json"], optional = true }
 

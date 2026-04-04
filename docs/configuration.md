@@ -61,6 +61,20 @@
 | `Full` | Force full motion for this entity |
 | `Reduced` | Force reduced motion for this entity |
 
+## `TextAnimationMarkup`
+
+| Field | Type | Default | Valid Range | Effect |
+| --- | --- | --- | --- | --- |
+| `sections` | `Vec<String>` | empty | any section list | Source text with optional inline tags that are stripped into runtime effect ranges |
+
+## `TextRevealSound`
+
+| Field | Type | Default | Valid Range | Effect |
+| --- | --- | --- | --- | --- |
+| `cue_id` | `String` | `"text.reveal"` | any stable identifier | User-defined sound cue or event id to route into the game audio layer |
+| `every_n_units` | `usize` | `1` | `>= 1` | Emits at a lower cadence when set above `1` |
+| `skip_whitespace` | `bool` | `true` | `true` or `false` | Suppresses events for whitespace-only reveal units |
+
 ## Effect Range Targeting
 
 All effects use `TextRangeSelector`.
@@ -131,3 +145,22 @@ All current effects can use `EffectEnvelope`.
 | `speed` | `f32` | `2.5` | any finite value | Pulse speed | unchanged |
 | `phase_offset` | `f32` | `0.15` | any finite value | Per-glyph phase stride | unchanged |
 | `envelope` | `EffectEnvelope` | default | any envelope | Time-local intensity curve | unchanged |
+
+## Scale
+
+| Field | Type | Default | Valid Range | Impact | Reduced Motion |
+| --- | --- | --- | --- | --- | --- |
+| `range` | `TextRangeSelector` | `All` | any selector | Scope | unaffected |
+| `min_scale` | `f32` | `0.92` | `> 0.0` recommended | Lowest scale multiplier | unchanged |
+| `max_scale` | `f32` | `1.12` | `> 0.0` recommended | Highest scale multiplier | unchanged |
+| `speed` | `f32` | `2.0` | any finite value | Pulse speed | unchanged |
+| `phase_offset` | `f32` | `0.10` | any finite value | Per-glyph phase stride | unchanged |
+| `envelope` | `EffectEnvelope` | default | any envelope | Time-local intensity curve | unchanged |
+
+## Reveal Messages
+
+| Message | Fields | Meaning |
+| --- | --- | --- |
+| `TextRevealCheckpoint` | `entity`, `revealed_units`, `total_units` | Reveal count changed this frame |
+| `TextRevealAdvanced` | `entity`, `start_unit`, `end_unit`, `labels` | Newly revealed unit slice, useful for dialogue blips or subtitle hooks |
+| `TextRevealSoundRequested` | `entity`, `cue_id`, `unit_index`, `label` | Optional sound hook for the just-revealed unit cadence |

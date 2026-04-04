@@ -65,10 +65,13 @@ fn typewriter_showcase() -> Scenario {
         .then(Action::WaitFrames(1))
         .then(Action::Screenshot("typewriter_start".into()))
         .then(Action::WaitFrames(24))
-        .then(assertions::custom("dialogue reaches a mid-reveal checkpoint", |world| {
+        .then(assertions::custom("dialogue reaches a mid-reveal checkpoint with runtime markup effects and sound hooks", |world| {
             let diagnostics = world.resource::<LabDiagnostics>();
             diagnostics.dialogue_visible_units > 0
                 && diagnostics.dialogue_visible_units < diagnostics.dialogue_total_units
+                && diagnostics.dialogue_effect_count >= 3
+                && diagnostics.sound_request_count > 0
+                && diagnostics.last_sound_cue.as_deref() == Some("lab.dialogue.blip")
         }))
         .then(Action::Screenshot("typewriter_mid".into()))
         .then(Action::WaitFrames(1))

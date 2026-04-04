@@ -15,7 +15,8 @@ saddle-animation-text-animation = { git = "https://github.com/julien-blanchon/sa
 ```rust,no_run
 use bevy::prelude::*;
 use saddle_animation_text_animation::{
-    TextAnimationBundle, TextAnimationConfig, TextAnimationPlugin, TextEffect, WaveEffect,
+    TextAnimationBundle, TextAnimationConfig, TextAnimationMarkup, TextAnimationPlugin,
+    TextEffect, WaveEffect,
 };
 
 fn main() {
@@ -31,12 +32,13 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         Name::new("World Label"),
-        Text2d::new("Signal uplink stable"),
+        Text2d::new(""),
         TextFont {
             font_size: 36.0,
             ..default()
         },
         TextColor(Color::WHITE),
+        TextAnimationMarkup::single("<wave>Signal uplink</wave> stable"),
         TextAnimationBundle {
             config: TextAnimationConfig::typewriter(20.0)
                 .with_effect(TextEffect::Wave(WaveEffect::default())),
@@ -85,9 +87,11 @@ app.add_plugins(TextAnimationPlugin::always_on(Update));
 | `TextMotionPreference` | Per-entity motion override: inherit, full motion, or reduced motion |
 | `TextAnimationAccessibility` | Global reduced-motion resource |
 | `TypewriterConfig`, `RevealMode`, `PunctuationDelayConfig` | Reveal settings |
-| `WaveEffect`, `ShakeEffect`, `RainbowEffect`, `AlphaPulseEffect`, `TextEffect` | Effect config types |
+| `WaveEffect`, `ShakeEffect`, `RainbowEffect`, `AlphaPulseEffect`, `ScaleEffect`, `TextEffect` | Effect config types |
+| `TextAnimationMarkup` | Inline-tag source that strips markup into effect ranges at runtime |
+| `TextRevealSound` | Optional per-unit sound trigger config for dialogue blips or subtitle ticks |
 | `TextAnimationCommand`, `TextAnimationAction` | Playback commands sent as Bevy messages |
-| `TextAnimationStarted`, `TextAnimationCompleted`, `TextAnimationLoopFinished`, `TextRevealCheckpoint` | Runtime marker messages |
+| `TextAnimationStarted`, `TextAnimationCompleted`, `TextAnimationLoopFinished`, `TextRevealCheckpoint`, `TextRevealAdvanced`, `TextRevealSoundRequested` | Runtime marker messages |
 | `TextAnimationDebugState` | Per-entity diagnostics for reveal count, glyph count, elapsed time, and effect count |
 
 ## Effects
@@ -98,10 +102,25 @@ app.add_plugins(TextAnimationPlugin::always_on(Update));
 - Deterministic seedable shake
 - Rainbow color cycling
 - Alpha pulse for non-positional emphasis
+- Scale pulse for dialogue emphasis without layout rebuilds
 - Ordered effect composition on the same text block
 - Range targeting by grapheme, word, line, section, or the full text
+- Inline markup tags: `<wave>`, `<shake>`, `<rainbow>`, `<alpha>` / `<pulse>`, and `<scale>`
+- Optional per-unit sound requests for dialogue blips or subtitle ticks
 
 Effects compose in declaration order. Positional offsets add together. Rainbow blends on top of the current color, and alpha pulse multiplies the current visibility.
+
+## Inline Markup
+
+Attach `TextAnimationMarkup` when authored dialogue is easier to read as tagged text than as manual grapheme ranges:
+
+```rust
+TextAnimationMarkup::single(
+    "Commander: <wave>steady</wave> approach, then <shake>burn hard</shake>."
+)
+```
+
+The runtime strips the tags from the visible text, converts each tag span into the matching `TextEffect`, emits `TextRevealAdvanced` with the newly revealed unit labels, and can also emit `TextRevealSoundRequested` when a `TextRevealSound` component is attached.
 
 ## Reduced Motion
 
@@ -124,6 +143,7 @@ Internally the runtime resolves playback state in `DetectChanges`, `Advance`, an
 | Example | Run | What it demonstrates |
 | --- | --- | --- |
 | `basic` | `cargo run -p saddle-animation-text-animation-example-basic` | Minimal UI plus `Text2d` usage |
+| `dialogue_box` | `cargo run -p saddle-animation-text-animation-example-dialogue-box` | Dialogue UI with inline markup and per-unit voice-blip hooks |
 | `typewriter` | `cargo run -p saddle-animation-text-animation-example-typewriter` | Reveal, punctuation delay, pause/resume, finish-now, and restart |
 | `layered_effects` | `cargo run -p saddle-animation-text-animation-example-layered-effects` | Explicit effect ordering and range-targeted emphasis |
 | `reduced_motion` | `cargo run -p saddle-animation-text-animation-example-reduced-motion` | Full-motion and reduced-motion variants side by side |

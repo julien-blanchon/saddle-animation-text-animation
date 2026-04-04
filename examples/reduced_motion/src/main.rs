@@ -2,16 +2,14 @@ use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
 use saddle_animation_text_animation::{
-    RainbowEffect, ShakeEffect, TextAnimationAccessibility, TextAnimationBundle,
-    TextAnimationConfig, TextEffect, TextMotionPreference, TypewriterConfig, WaveEffect,
+    RainbowEffect, ShakeEffect, TextAnimationBundle, TextAnimationConfig, TextEffect,
+    TextMotionPreference, TypewriterConfig, WaveEffect,
 };
 
 fn main() {
     let mut app = App::new();
     common::configure_app(&mut app, "text_animation reduced_motion");
-    app.insert_resource(TextAnimationAccessibility {
-        reduced_motion: true,
-    });
+    common::set_reduced_motion(&mut app, true);
     app.add_systems(Startup, setup);
     app.run();
 }

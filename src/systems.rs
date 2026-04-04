@@ -8,25 +8,29 @@ use bevy::prelude::*;
 use bevy::sprite::{Anchor, Sprite, Text2d};
 use bevy::text::{
     ComputedTextBlock, TextBackgroundColor, TextColor, TextLayoutInfo, TextReader, TextRoot,
-    UnderlineColor,
+    TextWriter, UnderlineColor,
 };
 use bevy::ui::UiGlobalTransform;
 use bevy::{
-    prelude::TextUiReader, sprite::Text2dReader, sprite::Text2dShadow, text::StrikethroughColor,
+    prelude::TextUiReader,
+    sprite::{Text2dReader, Text2dShadow, Text2dWriter},
+    text::StrikethroughColor,
+    ui::widget::TextUiWriter,
 };
 
 use crate::TextAnimationRuntimeState;
 use crate::components::{
     CachedSectionStyle, HiddenStyleCache, RootKind, TextAnimationAccessibility,
-    TextAnimationController, TextAnimationDebugState, TextAnimationGlyph, TextAnimationRenderRoot,
-    TextAnimationRuntime, TextMotionPreference,
+    TextAnimationController, TextAnimationDebugState, TextAnimationGlyph, TextAnimationMarkup,
+    TextAnimationRenderRoot, TextAnimationRuntime, TextMotionPreference, TextRevealSound,
 };
 use crate::config::{TextAnimationConfig, TextAnimationPlaybackState, TextAnimationTimeSource};
 use crate::effect::{GlyphVisual, apply_effects};
-use crate::glyph_cache::{SectionSnapshot, TextAnimationCache, build_cache};
+use crate::glyph_cache::{RevealUnit, SectionSnapshot, TextAnimationCache, build_cache};
+use crate::markup::parse_sections;
 use crate::messages::{
     TextAnimationCommand, TextAnimationCompleted, TextAnimationLoopFinished, TextAnimationStarted,
-    TextRevealCheckpoint,
+    TextRevealAdvanced, TextRevealCheckpoint, TextRevealSoundRequested,
 };
 
 #[derive(SystemParam)]
@@ -35,6 +39,8 @@ pub(crate) struct AnimationMessages<'w, 's> {
     completed: MessageWriter<'w, TextAnimationCompleted>,
     looped: MessageWriter<'w, TextAnimationLoopFinished>,
     checkpoints: MessageWriter<'w, TextRevealCheckpoint>,
+    reveal_advanced: MessageWriter<'w, TextRevealAdvanced>,
+    reveal_sound: MessageWriter<'w, TextRevealSoundRequested>,
     marker: PhantomData<&'s ()>,
 }
 
@@ -100,6 +106,59 @@ pub(crate) fn initialize_new_animations(
             TextAnimationRuntime::default(),
             TextAnimationDebugState::default(),
         ));
+    }
+}
+
+pub(crate) fn apply_markup_sources(
+    runtime_state: Res<TextAnimationRuntimeState>,
+    mut ui_roots: Query<
+        (
+            Entity,
+            Ref<TextAnimationMarkup>,
+            Option<&mut TextAnimationRuntime>,
+        ),
+        (With<Text>, Without<Text2d>),
+    >,
+    mut world_roots: Query<
+        (
+            Entity,
+            Ref<TextAnimationMarkup>,
+            Option<&mut TextAnimationRuntime>,
+        ),
+        (With<Text2d>, Without<Text>),
+    >,
+    mut writers: ParamSet<(TextUiWriter, Text2dWriter)>,
+) {
+    if !runtime_state.active {
+        return;
+    }
+
+    for (entity, markup, runtime) in &mut ui_roots {
+        if !markup.is_added() && !markup.is_changed() {
+            continue;
+        }
+
+        let parsed = parse_sections(&markup.sections);
+        apply_markup_sections(entity, &parsed.sections, &mut writers.p0());
+        if let Some(mut runtime) = runtime {
+            runtime.markup_effects = parsed.effects;
+            runtime.needs_rebuild = true;
+            runtime.root_kind = Some(RootKind::Ui);
+        }
+    }
+
+    for (entity, markup, runtime) in &mut world_roots {
+        if !markup.is_added() && !markup.is_changed() {
+            continue;
+        }
+
+        let parsed = parse_sections(&markup.sections);
+        apply_markup_sections(entity, &parsed.sections, &mut writers.p1());
+        if let Some(mut runtime) = runtime {
+            runtime.markup_effects = parsed.effects;
+            runtime.needs_rebuild = true;
+            runtime.root_kind = Some(RootKind::World);
+        }
     }
 }
 
@@ -280,6 +339,7 @@ pub(crate) fn apply_ui_output(
             &TextAnimationConfig,
             &TextAnimationController,
             Option<&TextMotionPreference>,
+            Option<&TextRevealSound>,
             &ComputedTextBlock,
             Ref<TextLayoutInfo>,
             &ComputedNode,
@@ -319,6 +379,7 @@ pub(crate) fn apply_ui_output(
         config,
         controller,
         motion,
+        reveal_sound,
         computed,
         layout_info,
         computed_node,
@@ -375,10 +436,13 @@ pub(crate) fn apply_ui_output(
         let reduced_motion = runtime.reduced_motion_active;
         let visible_units = runtime.evaluated_visible_units;
         let visible_graphemes = runtime.evaluated_visible_graphemes;
+        let reveal_units = runtime.cache.units.clone();
         update_messages(
             entity,
             visible_units,
-            runtime.cache.units.len(),
+            reveal_units.len(),
+            &reveal_units,
+            reveal_sound,
             &mut runtime,
             &mut messages,
         );
@@ -403,17 +467,18 @@ pub(crate) fn apply_ui_output(
             }
             apply_effects(
                 &mut visual,
-                &config.effects,
+                config.effects.iter().chain(runtime.markup_effects.iter()),
                 glyph,
                 grapheme,
                 runtime.evaluated_effect_elapsed_secs,
                 reduced_motion,
             );
 
-            node.left = Val::Px(glyph.center.x - glyph.size.x * 0.5 + visual.offset.x);
-            node.top = Val::Px(glyph.center.y - glyph.size.y * 0.5 + visual.offset.y);
-            node.width = Val::Px(glyph.size.x);
-            node.height = Val::Px(glyph.size.y);
+            let scaled_size = glyph.size * visual.scale;
+            node.left = Val::Px(glyph.center.x - scaled_size.x * 0.5 + visual.offset.x);
+            node.top = Val::Px(glyph.center.y - scaled_size.y * 0.5 + visual.offset.y);
+            node.width = Val::Px(scaled_size.x);
+            node.height = Val::Px(scaled_size.y);
             image_node.rect = Some(glyph.rect);
             image_node.color = Color::LinearRgba(visual.color.with_alpha(visual.alpha));
             if let Some(handle) = image_handle_for(images, glyph.texture) {
@@ -427,7 +492,7 @@ pub(crate) fn apply_ui_output(
         debug.revealed_units = visible_units;
         debug.elapsed_secs = controller.elapsed_secs;
         debug.render_glyphs = runtime.cache.glyphs.len();
-        debug.effect_count = config.effects.len();
+        debug.effect_count = config.effects.len() + runtime.markup_effects.len();
         debug.active = true;
     }
 }
@@ -444,6 +509,7 @@ pub(crate) fn apply_world_output(
             &TextAnimationConfig,
             &TextAnimationController,
             Option<&TextMotionPreference>,
+            Option<&TextRevealSound>,
             &ComputedTextBlock,
             Ref<TextLayoutInfo>,
             &Anchor,
@@ -475,6 +541,7 @@ pub(crate) fn apply_world_output(
         config,
         controller,
         motion,
+        reveal_sound,
         computed,
         layout_info,
         anchor,
@@ -523,10 +590,13 @@ pub(crate) fn apply_world_output(
         let reduced_motion = runtime.reduced_motion_active;
         let visible_units = runtime.evaluated_visible_units;
         let visible_graphemes = runtime.evaluated_visible_graphemes;
+        let reveal_units = runtime.cache.units.clone();
         update_messages(
             entity,
             visible_units,
-            runtime.cache.units.len(),
+            reveal_units.len(),
+            &reveal_units,
+            reveal_sound,
             &mut runtime,
             &mut messages,
         );
@@ -554,7 +624,7 @@ pub(crate) fn apply_world_output(
             }
             apply_effects(
                 &mut visual,
-                &config.effects,
+                config.effects.iter().chain(runtime.markup_effects.iter()),
                 glyph,
                 grapheme,
                 runtime.evaluated_effect_elapsed_secs,
@@ -568,7 +638,7 @@ pub(crate) fn apply_world_output(
             );
             sprite.rect = Some(glyph.rect);
             sprite.color = Color::LinearRgba(visual.color.with_alpha(visual.alpha));
-            sprite.custom_size = Some(glyph.size);
+            sprite.custom_size = Some(glyph.size * visual.scale);
             if let Some(handle) = image_handle_for(images, glyph.texture) {
                 sprite.image = handle;
             }
@@ -580,7 +650,7 @@ pub(crate) fn apply_world_output(
         debug.revealed_units = visible_units;
         debug.elapsed_secs = controller.elapsed_secs;
         debug.render_glyphs = runtime.cache.glyphs.len();
-        debug.effect_count = config.effects.len();
+        debug.effect_count = config.effects.len() + runtime.markup_effects.len();
         debug.active = true;
     }
 }
@@ -641,6 +711,25 @@ fn snapshot_world_sections(
         }
     }
     sections
+}
+
+fn apply_markup_sections<R: TextRoot>(
+    root: Entity,
+    sections: &[String],
+    writer: &mut TextWriter<R>,
+) {
+    if sections.is_empty() {
+        return;
+    }
+
+    for (index, clean_text) in sections.iter().enumerate() {
+        let Some(mut current_text) = writer.get_text(root, index) else {
+            break;
+        };
+        if current_text.as_str() != clean_text {
+            *current_text = clean_text.clone();
+        }
+    }
 }
 
 fn collect_sections<R: TextRoot>(
@@ -947,6 +1036,8 @@ fn update_messages(
     entity: Entity,
     visible_units: usize,
     total_units: usize,
+    reveal_units: &[RevealUnit],
+    reveal_sound: Option<&TextRevealSound>,
     runtime: &mut TextAnimationRuntime,
     messages: &mut AnimationMessages,
 ) {
@@ -961,6 +1052,39 @@ fn update_messages(
             revealed_units: visible_units,
             total_units,
         });
+        if visible_units > runtime.last_visible_units {
+            messages.reveal_advanced.write(TextRevealAdvanced {
+                entity,
+                start_unit: runtime.last_visible_units,
+                end_unit: visible_units,
+                labels: reveal_units[runtime.last_visible_units..visible_units]
+                    .iter()
+                    .map(|unit| unit.label.clone())
+                    .collect(),
+            });
+            if let Some(reveal_sound) = reveal_sound {
+                let step = reveal_sound.every_n_units.max(1);
+                for (unit_index, unit) in reveal_units
+                    .iter()
+                    .enumerate()
+                    .take(visible_units)
+                    .skip(runtime.last_visible_units)
+                {
+                    if reveal_sound.skip_whitespace && unit.label.chars().all(char::is_whitespace) {
+                        continue;
+                    }
+                    if (unit_index + 1) % step != 0 {
+                        continue;
+                    }
+                    messages.reveal_sound.write(TextRevealSoundRequested {
+                        entity,
+                        cue_id: reveal_sound.cue_id.clone(),
+                        unit_index,
+                        label: unit.label.clone(),
+                    });
+                }
+            }
+        }
         runtime.last_visible_units = visible_units;
     }
 

@@ -8,6 +8,7 @@ publish = false
 bevy = { workspace = true }
 saddle-animation-text-animation = { workspace = true }
 saddle-animation-text-animation-example-common = { path = "../common" }
+saddle-pane = { workspace = true }
 
 [lints]
 workspace = true

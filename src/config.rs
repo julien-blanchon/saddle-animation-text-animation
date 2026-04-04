@@ -211,11 +211,35 @@ impl Default for AlphaPulseEffect {
 }
 
 #[derive(Debug, Clone, Reflect, PartialEq)]
+pub struct ScaleEffect {
+    pub range: TextRangeSelector,
+    pub min_scale: f32,
+    pub max_scale: f32,
+    pub speed: f32,
+    pub phase_offset: f32,
+    pub envelope: EffectEnvelope,
+}
+
+impl Default for ScaleEffect {
+    fn default() -> Self {
+        Self {
+            range: TextRangeSelector::All,
+            min_scale: 0.92,
+            max_scale: 1.12,
+            speed: 2.0,
+            phase_offset: 0.1,
+            envelope: EffectEnvelope::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Reflect, PartialEq)]
 pub enum TextEffect {
     Wave(WaveEffect),
     Shake(ShakeEffect),
     Rainbow(RainbowEffect),
     AlphaPulse(AlphaPulseEffect),
+    Scale(ScaleEffect),
 }
 
 #[derive(Debug, Clone, Component, Reflect, PartialEq)]

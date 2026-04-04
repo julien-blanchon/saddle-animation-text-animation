@@ -2,21 +2,23 @@ mod components;
 mod config;
 mod effect;
 mod glyph_cache;
+mod markup;
 mod messages;
 mod systems;
 
 pub use components::{
     TextAnimationAccessibility, TextAnimationBundle, TextAnimationController,
-    TextAnimationDebugState, TextMotionPreference,
+    TextAnimationDebugState, TextAnimationMarkup, TextMotionPreference, TextRevealSound,
 };
 pub use config::{
     AlphaPulseEffect, EffectEnvelope, PunctuationDelayConfig, RainbowEffect, RevealMode,
-    ShakeEffect, TextAnimationConfig, TextAnimationPlaybackState, TextAnimationTimeSource,
-    TextEffect, TextEnvelopeEasing, TextRangeSelector, TypewriterConfig, WaveEffect,
+    ScaleEffect, ShakeEffect, TextAnimationConfig, TextAnimationPlaybackState,
+    TextAnimationTimeSource, TextEffect, TextEnvelopeEasing, TextRangeSelector, TypewriterConfig,
+    WaveEffect,
 };
 pub use messages::{
     TextAnimationAction, TextAnimationCommand, TextAnimationCompleted, TextAnimationLoopFinished,
-    TextAnimationStarted, TextRevealCheckpoint,
+    TextAnimationStarted, TextRevealAdvanced, TextRevealCheckpoint, TextRevealSoundRequested,
 };
 
 use bevy::{
@@ -78,23 +80,29 @@ impl Plugin for TextAnimationPlugin {
         }
 
         app.init_resource::<TextAnimationRuntimeState>()
+            .init_resource::<bevy::text::TextIterScratch>()
             .init_resource::<TextAnimationAccessibility>()
             .add_message::<TextAnimationCommand>()
             .add_message::<TextAnimationStarted>()
             .add_message::<TextAnimationCompleted>()
             .add_message::<TextAnimationLoopFinished>()
             .add_message::<TextRevealCheckpoint>()
+            .add_message::<TextRevealAdvanced>()
+            .add_message::<TextRevealSoundRequested>()
             .register_type::<AlphaPulseEffect>()
             .register_type::<EffectEnvelope>()
             .register_type::<PunctuationDelayConfig>()
             .register_type::<RainbowEffect>()
             .register_type::<RevealMode>()
+            .register_type::<ScaleEffect>()
             .register_type::<ShakeEffect>()
             .register_type::<TextAnimationAccessibility>()
             .register_type::<TextAnimationConfig>()
             .register_type::<TextAnimationController>()
             .register_type::<TextAnimationDebugState>()
+            .register_type::<TextAnimationMarkup>()
             .register_type::<TextAnimationPlaybackState>()
+            .register_type::<TextRevealSound>()
             .register_type::<TextAnimationTimeSource>()
             .register_type::<TextEffect>()
             .register_type::<TextEnvelopeEasing>()
@@ -117,6 +125,7 @@ impl Plugin for TextAnimationPlugin {
                 self.update_schedule,
                 (
                     systems::initialize_new_animations.in_set(TextAnimationSystems::DetectChanges),
+                    systems::apply_markup_sources.in_set(TextAnimationSystems::DetectChanges),
                     systems::detect_changes.in_set(TextAnimationSystems::DetectChanges),
                     systems::apply_commands.in_set(TextAnimationSystems::Advance),
                     systems::advance.in_set(TextAnimationSystems::Advance),
@@ -153,3 +162,7 @@ mod effect_tests;
 #[cfg(test)]
 #[path = "systems_tests.rs"]
 mod systems_tests;
+
+#[cfg(test)]
+#[path = "markup_tests.rs"]
+mod markup_tests;

@@ -1,7 +1,9 @@
 use bevy::math::Vec2;
 use bevy::prelude::*;
 
-use crate::config::{EffectEnvelope, RainbowEffect, ShakeEffect, TextEffect, WaveEffect};
+use crate::config::{
+    EffectEnvelope, RainbowEffect, ScaleEffect, ShakeEffect, TextEffect, WaveEffect,
+};
 use crate::effect::{GlyphVisual, apply_effects, envelope_factor, matches_range};
 use crate::glyph_cache::{GlyphEntry, GraphemeEntry};
 
@@ -154,4 +156,29 @@ fn reduced_motion_suppresses_positional_effects_when_scale_is_zero() {
     );
 
     assert_eq!(visual.offset, Vec2::ZERO);
+}
+
+#[test]
+fn scale_effect_changes_visual_scale() {
+    let glyph = sample_glyph();
+    let grapheme = sample_grapheme();
+    let mut visual = GlyphVisual::new(Color::WHITE);
+
+    apply_effects(
+        &mut visual,
+        [TextEffect::Scale(ScaleEffect {
+            min_scale: 0.8,
+            max_scale: 1.4,
+            speed: 1.0,
+            phase_offset: 0.0,
+            ..ScaleEffect::default()
+        })]
+        .iter(),
+        &glyph,
+        &grapheme,
+        0.4,
+        false,
+    );
+
+    assert_ne!(visual.scale, Vec2::ONE);
 }

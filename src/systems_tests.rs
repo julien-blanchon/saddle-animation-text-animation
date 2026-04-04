@@ -10,7 +10,8 @@ use crate::components::TextAnimationRuntime;
 use crate::systems::image_handle_for;
 use crate::{
     TextAnimationAction, TextAnimationBundle, TextAnimationCommand, TextAnimationCompleted,
-    TextAnimationDebugState, TextAnimationPlugin,
+    TextAnimationDebugState, TextAnimationMarkup, TextAnimationPlugin, TextEffect,
+    TextRevealAdvanced, TextRevealSound, TextRevealSoundRequested,
 };
 
 fn make_app() -> App {
@@ -228,4 +229,89 @@ fn world_glyph_overlay_settles_after_layout_arrives() {
         .expect("runtime should be present");
     assert_eq!(runtime.render_root, Some(render_root));
     assert_eq!(runtime.glyph_entities, vec![glyph_entity]);
+}
+
+#[test]
+fn finish_now_emits_reveal_advanced_labels() {
+    let mut app = make_app();
+    let entity = spawn_world_text(&mut app, "OK");
+    app.update();
+    let _ = drain_messages::<TextRevealAdvanced>(&mut app);
+
+    app.world_mut()
+        .resource_mut::<Messages<TextAnimationCommand>>()
+        .write(TextAnimationCommand {
+            entity,
+            action: TextAnimationAction::FinishNow,
+        });
+    app.update();
+
+    let reveal_messages = drain_messages::<TextRevealAdvanced>(&mut app);
+    assert_eq!(reveal_messages.len(), 1);
+    assert_eq!(reveal_messages[0].entity, entity);
+    assert_eq!(reveal_messages[0].start_unit, 1);
+    assert_eq!(reveal_messages[0].end_unit, 2);
+    assert_eq!(reveal_messages[0].labels, vec!["K".to_owned()]);
+}
+
+#[test]
+fn reveal_sound_requests_skip_whitespace_units() {
+    let mut app = make_app();
+    let entity = spawn_world_text(&mut app, "A B");
+    app.world_mut()
+        .entity_mut(entity)
+        .insert(TextRevealSound::default());
+    app.update();
+    let _ = drain_messages::<TextRevealSoundRequested>(&mut app);
+
+    app.world_mut()
+        .resource_mut::<Messages<TextAnimationCommand>>()
+        .write(TextAnimationCommand {
+            entity,
+            action: TextAnimationAction::FinishNow,
+        });
+    app.update();
+
+    let sounds = drain_messages::<TextRevealSoundRequested>(&mut app);
+    assert_eq!(sounds.len(), 1);
+    assert_eq!(sounds[0].label, "B");
+    assert!(sounds.iter().all(|message| message.cue_id == "text.reveal"));
+}
+
+#[test]
+fn markup_refreshes_effects_even_when_clean_text_is_unchanged() {
+    let mut app = make_app();
+    let entity = spawn_world_text(&mut app, "Signal");
+    app.update();
+
+    app.world_mut()
+        .entity_mut(entity)
+        .insert(TextAnimationMarkup::single("<wave>Signal</wave>"));
+    app.update();
+
+    let runtime = app
+        .world()
+        .entity(entity)
+        .get::<TextAnimationRuntime>()
+        .expect("runtime should exist after initialization");
+    assert!(matches!(
+        runtime.markup_effects.as_slice(),
+        [TextEffect::Wave(_)]
+    ));
+
+    app.world_mut()
+        .entity_mut(entity)
+        .insert(TextAnimationMarkup::single("<shake>Signal</shake>"));
+    app.update();
+    app.update();
+
+    let runtime = app
+        .world()
+        .entity(entity)
+        .get::<TextAnimationRuntime>()
+        .expect("runtime should exist after markup refresh");
+    assert!(matches!(
+        runtime.markup_effects.as_slice(),
+        [TextEffect::Shake(_)]
+    ));
 }

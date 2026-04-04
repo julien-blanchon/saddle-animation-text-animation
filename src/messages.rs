@@ -36,3 +36,19 @@ pub struct TextRevealCheckpoint {
     pub revealed_units: usize,
     pub total_units: usize,
 }
+
+#[derive(Debug, Clone, Message)]
+pub struct TextRevealAdvanced {
+    pub entity: Entity,
+    pub start_unit: usize,
+    pub end_unit: usize,
+    pub labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Message)]
+pub struct TextRevealSoundRequested {
+    pub entity: Entity,
+    pub cue_id: String,
+    pub unit_index: usize,
+    pub label: String,
+}

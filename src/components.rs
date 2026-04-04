@@ -19,6 +19,38 @@ pub struct TextAnimationAccessibility {
     pub reduced_motion: bool,
 }
 
+#[derive(Debug, Clone, Component, Reflect, PartialEq, Default)]
+#[reflect(Component)]
+pub struct TextAnimationMarkup {
+    pub sections: Vec<String>,
+}
+
+impl TextAnimationMarkup {
+    pub fn single(text: impl Into<String>) -> Self {
+        Self {
+            sections: vec![text.into()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Component, Reflect, PartialEq, Eq)]
+#[reflect(Component)]
+pub struct TextRevealSound {
+    pub cue_id: String,
+    pub every_n_units: usize,
+    pub skip_whitespace: bool,
+}
+
+impl Default for TextRevealSound {
+    fn default() -> Self {
+        Self {
+            cue_id: "text.reveal".into(),
+            every_n_units: 1,
+            skip_whitespace: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct TextAnimationController {
@@ -113,6 +145,7 @@ pub(crate) struct TextAnimationRuntime {
     pub root_kind: Option<RootKind>,
     pub render_root: Option<Entity>,
     pub glyph_entities: Vec<Entity>,
+    pub markup_effects: Vec<crate::config::TextEffect>,
     pub hidden_styles: HiddenStyleCache,
     pub cache: crate::glyph_cache::TextAnimationCache,
     pub sent_started: bool,
@@ -132,6 +165,7 @@ impl Default for TextAnimationRuntime {
             root_kind: None,
             render_root: None,
             glyph_entities: Vec::new(),
+            markup_effects: Vec::new(),
             hidden_styles: HiddenStyleCache::default(),
             cache: crate::glyph_cache::TextAnimationCache::default(),
             sent_started: false,
