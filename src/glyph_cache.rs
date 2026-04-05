@@ -104,6 +104,19 @@ pub(crate) fn build_cache(
     }
 }
 
+/// Recalculate only reveal unit timing from existing graphemes.
+/// Used when animation config changes (speed, effects) without text content changing.
+/// Much cheaper than a full `build_cache` because it skips grapheme segmentation
+/// and glyph remapping.
+pub(crate) fn recalc_units(cache: &mut TextAnimationCache, config: &TextAnimationConfig) {
+    let units = build_units(config, &mut cache.graphemes);
+    cache.total_duration_secs = units
+        .last()
+        .map(|unit| unit.reveal_time_secs)
+        .unwrap_or(0.0);
+    cache.units = units;
+}
+
 fn segment_graphemes(sections: &[SectionSnapshot]) -> Vec<GraphemeEntry> {
     let mut graphemes = Vec::new();
     let mut global_line = 0usize;

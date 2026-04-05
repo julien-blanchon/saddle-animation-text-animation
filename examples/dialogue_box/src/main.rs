@@ -1,6 +1,7 @@
 use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     TextAnimationBundle, TextAnimationConfig, TextAnimationMarkup, TextRevealSound,
     TextRevealSoundRequested,
@@ -31,17 +32,26 @@ fn setup(mut commands: Commands) {
     );
 
     commands.entity(root).with_children(|parent| {
+        parent.spawn((
+            Name::new("Instructions"),
+            Text::new("Inline markup tags (<wave>, <shake>, <scale>) drive per-word effects. The blip counter tracks reveal sound events."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        ));
         parent
             .spawn((
                 Name::new("Dialogue Panel"),
                 Node {
                     width: px(780.0),
+                    max_width: Val::Percent(100.0),
                     min_height: px(240.0),
                     margin: UiRect::top(px(18.0)),
                     padding: UiRect::all(px(20.0)),
                     column_gap: px(18.0),
                     flex_direction: FlexDirection::Row,
                     border_radius: BorderRadius::all(px(24.0)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.09, 0.11, 0.16)),
@@ -78,8 +88,9 @@ fn setup(mut commands: Commands) {
                         column.spawn((
                             Name::new("Dialogue Text"),
                             Text::new(""),
-                            common::demo_text_font(30.0),
+                            common::demo_text_font(28.0),
                             TextColor(Color::WHITE),
+                            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
                             TextAnimationMarkup::single(
                                 "Commander: <wave>Orbit lock achieved</wave>. Route to <shake>docking lane four</shake> and stand by for <scale>burn confirmation</scale>.",
                             ),

@@ -40,6 +40,8 @@ The runtime stages are:
 3. `EvaluateEffects`
 4. `ApplyOutput`
 
+Within `DetectChanges`, system ordering is explicit: `initialize_new_animations` runs first, then `apply_markup_sources` and `detect_changes` run after it. This ordering is critical because markup processing needs an initialized runtime to attach its generated effect ranges.
+
 Detailed flow:
 
 1. Detect dirty config or source-text changes.
@@ -98,6 +100,8 @@ If the text or animation config changes:
 - grapheme and reveal-unit caches rebuild on the next output pass
 - overlay glyph data retries until Bevy has published atlas-backed glyph layout that can be mapped
 - playback continues from the controller’s current elapsed time unless the consumer explicitly restarts it
+
+When only the animation config changes (e.g. from a live parameter pane) but the source text is unchanged, the runtime uses a lightweight `needs_recalc_units` path that recalculates reveal-unit timing without remapping glyphs or rebuilding the render tree. This avoids the visual flicker that a full rebuild would cause during interactive editing.
 
 This keeps the public control model simple, but consumers should restart playback when a new text payload semantically replaces the old one.
 

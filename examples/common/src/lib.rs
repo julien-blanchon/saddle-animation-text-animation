@@ -1,5 +1,6 @@
 use bevy::app::AppExit;
 use bevy::prelude::*;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     AlphaPulseEffect, RainbowEffect, ScaleEffect, ShakeEffect, TextAnimationAccessibility,
     TextAnimationConfig, TextAnimationPlugin, TextEffect, WaveEffect,
@@ -54,7 +55,10 @@ pub fn configure_app(app: &mut App, title: &str) {
 }
 
 pub fn install_demo_pane(app: &mut App) {
-    if app.world().contains_resource::<TextAnimationDemoPaneInstalled>() {
+    if app
+        .world()
+        .contains_resource::<TextAnimationDemoPaneInstalled>()
+    {
         return;
     }
 
@@ -129,6 +133,7 @@ pub fn spawn_base_scene(commands: &mut Commands, title: &str, subtitle: &str) ->
                 padding: UiRect::all(Val::Px(26.0)),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(16.0),
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
         ))
@@ -140,12 +145,14 @@ pub fn spawn_base_scene(commands: &mut Commands, title: &str, subtitle: &str) ->
             Text::new(title),
             demo_text_font(22.0),
             TextColor(Color::WHITE),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
         ));
         parent.spawn((
             Name::new("Example Subtitle"),
             Text::new(subtitle),
             demo_text_font(14.0),
             TextColor(Color::srgb(0.78, 0.83, 0.9)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
         ));
     });
 
@@ -170,7 +177,13 @@ pub fn pane_plugins() -> (
 
 fn capture_pane_baselines(
     mut commands: Commands,
-    query: Query<(Entity, &TextAnimationConfig), (Added<TextAnimationConfig>, Without<TextAnimationPaneBaseline>)>,
+    query: Query<
+        (Entity, &TextAnimationConfig),
+        (
+            Added<TextAnimationConfig>,
+            Without<TextAnimationPaneBaseline>,
+        ),
+    >,
 ) {
     for (entity, config) in &query {
         commands

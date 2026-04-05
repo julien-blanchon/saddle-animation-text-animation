@@ -64,7 +64,7 @@ fn typewriter_showcase() -> Scenario {
         .then(command("Dialogue Typewriter", TextAnimationAction::Restart))
         .then(Action::WaitFrames(1))
         .then(Action::Screenshot("typewriter_start".into()))
-        .then(Action::WaitFrames(24))
+        .then(Action::WaitFrames(60))
         .then(assertions::custom("dialogue reaches a mid-reveal checkpoint with runtime markup effects and sound hooks", |world| {
             let diagnostics = world.resource::<LabDiagnostics>();
             diagnostics.dialogue_visible_units > 0

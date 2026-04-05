@@ -1,6 +1,7 @@
 use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     AlphaPulseEffect, TextAnimationBundle, TextAnimationConfig, TextEffect, TypewriterConfig,
     WaveEffect,
@@ -21,6 +22,13 @@ fn setup(mut commands: Commands) {
     );
 
     commands.entity(root).with_children(|parent| {
+        parent.spawn((
+            Name::new("Instructions"),
+            Text::new("8 UI labels + 80 world-space labels run effects simultaneously. No per-frame text rebuilds."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        ));
         for index in 0..8 {
             parent.spawn((
                 Name::new(format!("Stress HUD {index:02}")),

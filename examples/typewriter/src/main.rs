@@ -1,6 +1,7 @@
 use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     TextAnimationAction, TextAnimationBundle, TextAnimationCommand, TextAnimationConfig,
     TextAnimationController, TextEffect, WaveEffect,
@@ -28,6 +29,16 @@ fn setup(mut commands: Commands) {
         "This example pauses, resumes, fast-forwards, and restarts the same text automatically.",
     );
 
+    commands.entity(root).with_children(|parent| {
+        parent.spawn((
+            Name::new("Instructions"),
+            Text::new("Automated script: pause at 1.15s, resume at 2s, finish instantly at 3.4s, restart at 5.2s."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        ));
+    });
+
     let entity = commands
         .spawn((
             Name::new("Scripted Typewriter"),
@@ -37,6 +48,7 @@ fn setup(mut commands: Commands) {
             common::demo_text_font(34.0),
             TextColor(Color::WHITE),
             TextShadow::default(),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
             TextAnimationBundle {
                 config: TextAnimationConfig::typewriter(14.0).with_effect(TextEffect::Wave(
                     WaveEffect {

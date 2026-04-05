@@ -2,6 +2,7 @@ use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
 use bevy::sprite::Text2dShadow;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     AlphaPulseEffect, TextAnimationBundle, TextAnimationConfig, TextEffect, TypewriterConfig,
     WaveEffect,
@@ -23,11 +24,19 @@ fn setup(mut commands: Commands) {
 
     commands.entity(root).with_children(|parent| {
         parent.spawn((
+            Name::new("Instructions"),
+            Text::new("Use the pane sliders to adjust reveal speed, effect speed, and motion scale."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        ));
+        parent.spawn((
             Name::new("Animated Headline"),
             Text::new("Shared text motion toolkit"),
             common::demo_text_font(50.0),
             TextColor(Color::WHITE),
             TextShadow::default(),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
             TextAnimationBundle {
                 config: TextAnimationConfig::typewriter(18.0)
                     .with_effect(TextEffect::Wave(WaveEffect {
@@ -45,6 +54,7 @@ fn setup(mut commands: Commands) {
             ),
             common::demo_text_font(24.0),
             TextColor(Color::srgb(0.88, 0.91, 0.97)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
             TextAnimationBundle {
                 config: TextAnimationConfig::typewriter(26.0),
                 ..default()

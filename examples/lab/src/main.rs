@@ -7,7 +7,6 @@ use bevy::prelude::*;
 use bevy::sprite::Text2dShadow;
 #[cfg(feature = "dev")]
 use bevy_brp_extras::BrpExtrasPlugin;
-use saddle_animation_text_animation_example_common::install_demo_pane;
 use saddle_animation_text_animation::{
     AlphaPulseEffect, RainbowEffect, ShakeEffect, TextAnimationAccessibility, TextAnimationAction,
     TextAnimationBundle, TextAnimationCommand, TextAnimationCompleted, TextAnimationConfig,
@@ -16,6 +15,7 @@ use saddle_animation_text_animation::{
     TextMotionPreference, TextRevealCheckpoint, TextRevealSound, TextRevealSoundRequested,
     TypewriterConfig, WaveEffect,
 };
+use saddle_animation_text_animation_example_common::install_demo_pane;
 
 const DEFAULT_BRPP_PORT: u16 = 15_742;
 
@@ -114,6 +114,7 @@ fn setup(mut commands: Commands) {
                 padding: UiRect::all(Val::Px(28.0)),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(18.0),
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
         ))

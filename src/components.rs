@@ -142,6 +142,10 @@ pub(crate) struct HiddenStyleCache {
 #[derive(Debug, Component)]
 pub(crate) struct TextAnimationRuntime {
     pub needs_rebuild: bool,
+    /// Config-only change: recalculate reveal unit timing without remapping glyphs.
+    /// This avoids expensive glyph remapping and render tree rebuilds when only
+    /// animation parameters (speed, amplitude, etc.) change via the pane.
+    pub needs_recalc_units: bool,
     pub root_kind: Option<RootKind>,
     pub render_root: Option<Entity>,
     pub glyph_entities: Vec<Entity>,
@@ -162,6 +166,7 @@ impl Default for TextAnimationRuntime {
     fn default() -> Self {
         Self {
             needs_rebuild: true,
+            needs_recalc_units: false,
             root_kind: None,
             render_root: None,
             glyph_entities: Vec::new(),
@@ -184,6 +189,4 @@ impl Default for TextAnimationRuntime {
 pub(crate) struct TextAnimationRenderRoot;
 
 #[derive(Debug, Component)]
-pub(crate) struct TextAnimationGlyph {
-    pub glyph_index: usize,
-}
+pub(crate) struct TextAnimationGlyph;

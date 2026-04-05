@@ -1,6 +1,7 @@
 use saddle_animation_text_animation_example_common as common;
 
 use bevy::prelude::*;
+use bevy::text::LineBreak;
 use saddle_animation_text_animation::{
     RainbowEffect, ShakeEffect, TextAnimationBundle, TextAnimationConfig, TextEffect,
     TextMotionPreference, TypewriterConfig, WaveEffect,
@@ -45,10 +46,18 @@ fn setup(mut commands: Commands) {
 
     commands.entity(root).with_children(|parent| {
         parent.spawn((
+            Name::new("Instructions"),
+            Text::new("Global reduced motion is on. Top: overrides to full motion (wave + shake + rainbow). Bottom: honors reduced motion (only rainbow color)."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        ));
+        parent.spawn((
             Name::new("Full Motion Sample"),
             Text::new("Full motion override"),
             common::demo_text_font(46.0),
             TextColor(Color::WHITE),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
             TextAnimationBundle {
                 config: shared_config.clone(),
                 motion: TextMotionPreference::Full,
@@ -60,6 +69,7 @@ fn setup(mut commands: Commands) {
             Text::new("Reduced motion variant"),
             common::demo_text_font(46.0),
             TextColor(Color::WHITE),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
             TextAnimationBundle {
                 config: shared_config,
                 motion: TextMotionPreference::Reduced,

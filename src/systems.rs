@@ -26,7 +26,9 @@ use crate::components::{
 };
 use crate::config::{TextAnimationConfig, TextAnimationPlaybackState, TextAnimationTimeSource};
 use crate::effect::{GlyphVisual, apply_effects};
-use crate::glyph_cache::{RevealUnit, SectionSnapshot, TextAnimationCache, build_cache};
+use crate::glyph_cache::{
+    RevealUnit, SectionSnapshot, TextAnimationCache, build_cache, recalc_units,
+};
 use crate::markup::parse_sections;
 use crate::messages::{
     TextAnimationCommand, TextAnimationCompleted, TextAnimationLoopFinished, TextAnimationStarted,
@@ -217,16 +219,23 @@ pub(crate) fn detect_changes(
     }
 
     for (config, text, mut runtime) in &mut ui_roots {
-        if config.is_changed() || text.is_changed() {
+        if text.is_changed() {
+            // Text content changed — full rebuild needed (re-segment graphemes, remap glyphs).
             runtime.needs_rebuild = true;
             runtime.root_kind = Some(RootKind::Ui);
+        } else if config.is_changed() {
+            // Config-only change (speed, effects, etc.) — just recalculate reveal unit timing.
+            // This is much cheaper and avoids flickering from glyph remapping/render tree rebuild.
+            runtime.needs_recalc_units = true;
         }
     }
 
     for (config, text, mut runtime) in &mut world_roots {
-        if config.is_changed() || text.is_changed() {
+        if text.is_changed() {
             runtime.needs_rebuild = true;
             runtime.root_kind = Some(RootKind::World);
+        } else if config.is_changed() {
+            runtime.needs_recalc_units = true;
         }
     }
 }
@@ -409,6 +418,7 @@ pub(crate) fn apply_ui_output(
         if runtime.needs_rebuild || layout_differs(&layout_info, &runtime.cache, &texture_atlases) {
             runtime.cache = build_cache(config, sections, computed, &layout_info, &texture_atlases);
             runtime.needs_rebuild = false;
+            runtime.needs_recalc_units = false;
             refresh_runtime_evaluation(
                 config,
                 controller,
@@ -421,6 +431,19 @@ pub(crate) fn apply_ui_output(
                 runtime.cache.glyphs.len(),
                 &mut runtime,
                 &mut commands,
+            );
+        } else if runtime.needs_recalc_units {
+            // Config-only change: recalculate reveal timing without remapping glyphs
+            // or rebuilding the render tree. This prevents flickering when adjusting
+            // parameters via the pane.
+            recalc_units(&mut runtime.cache, config);
+            runtime.needs_recalc_units = false;
+            refresh_runtime_evaluation(
+                config,
+                controller,
+                motion.copied(),
+                &motion_accessibility,
+                &mut runtime,
             );
         } else {
             sync_section_colors(&sections, &mut runtime.cache);
@@ -447,12 +470,11 @@ pub(crate) fn apply_ui_output(
             &mut messages,
         );
 
-        for glyph_entity in &runtime.glyph_entities {
-            let Ok((glyph_marker, mut node, mut image_node)) = glyph_query.get_mut(*glyph_entity)
-            else {
+        for (glyph_index, glyph_entity) in runtime.glyph_entities.iter().enumerate() {
+            let Ok((_, mut node, mut image_node)) = glyph_query.get_mut(*glyph_entity) else {
                 continue;
             };
-            let Some(glyph) = runtime.cache.glyphs.get(glyph_marker.glyph_index) else {
+            let Some(glyph) = runtime.cache.glyphs.get(glyph_index) else {
                 continue;
             };
             let grapheme = &runtime.cache.graphemes[glyph.primary_index];
@@ -570,6 +592,7 @@ pub(crate) fn apply_world_output(
         if runtime.needs_rebuild || layout_differs(&layout_info, &runtime.cache, &texture_atlases) {
             runtime.cache = build_cache(config, sections, computed, &layout_info, &texture_atlases);
             runtime.needs_rebuild = false;
+            runtime.needs_recalc_units = false;
             refresh_runtime_evaluation(
                 config,
                 controller,
@@ -582,6 +605,16 @@ pub(crate) fn apply_world_output(
                 runtime.cache.glyphs.len(),
                 &mut runtime,
                 &mut commands,
+            );
+        } else if runtime.needs_recalc_units {
+            recalc_units(&mut runtime.cache, config);
+            runtime.needs_recalc_units = false;
+            refresh_runtime_evaluation(
+                config,
+                controller,
+                motion.copied(),
+                &motion_accessibility,
+                &mut runtime,
             );
         } else {
             sync_section_colors(&sections, &mut runtime.cache);
@@ -604,12 +637,11 @@ pub(crate) fn apply_world_output(
         let size = layout_info.size;
         let top_left = (Anchor::TOP_LEFT.0 - anchor.as_vec()) * size;
 
-        for glyph_entity in &runtime.glyph_entities {
-            let Ok((glyph_marker, mut transform, mut sprite)) = glyph_query.get_mut(*glyph_entity)
-            else {
+        for (glyph_index, glyph_entity) in runtime.glyph_entities.iter().enumerate() {
+            let Ok((_, mut transform, mut sprite)) = glyph_query.get_mut(*glyph_entity) else {
                 continue;
             };
-            let Some(glyph) = runtime.cache.glyphs.get(glyph_marker.glyph_index) else {
+            let Some(glyph) = runtime.cache.glyphs.get(glyph_index) else {
                 continue;
             };
             let grapheme = &runtime.cache.graphemes[glyph.primary_index];
@@ -864,28 +896,39 @@ fn rebuild_ui_render_tree(
     runtime: &mut TextAnimationRuntime,
     commands: &mut Commands,
 ) {
-    if let Some(render_root) = runtime.render_root.take() {
-        commands.entity(render_root).despawn_children();
-        commands.entity(render_root).despawn();
+    let render_root = match runtime.render_root {
+        Some(root) => root,
+        None => {
+            let root = commands
+                .spawn((
+                    Name::new("Text Animation UI Overlay"),
+                    TextAnimationRenderRoot,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        ..default()
+                    },
+                ))
+                .id();
+            runtime.render_root = Some(root);
+            root
+        }
+    };
+
+    let current_count = runtime.glyph_entities.len();
+
+    // Despawn excess entities (only when we have more than needed)
+    if glyph_count < current_count {
+        for entity in runtime.glyph_entities.drain(glyph_count..) {
+            commands.entity(entity).despawn();
+        }
     }
 
-    let render_root = commands
-        .spawn((
-            Name::new("Text Animation UI Overlay"),
-            TextAnimationRenderRoot,
-            Node {
-                position_type: PositionType::Absolute,
-                ..default()
-            },
-        ))
-        .id();
-
-    runtime.glyph_entities.clear();
-    for glyph_index in 0..glyph_count {
+    // Spawn missing entities
+    for glyph_index in current_count.min(glyph_count)..glyph_count {
         let glyph = commands
             .spawn((
                 Name::new(format!("Animated Glyph {glyph_index}")),
-                TextAnimationGlyph { glyph_index },
+                TextAnimationGlyph,
                 Node {
                     position_type: PositionType::Absolute,
                     ..default()
@@ -896,7 +939,6 @@ fn rebuild_ui_render_tree(
         commands.entity(render_root).add_child(glyph);
         runtime.glyph_entities.push(glyph);
     }
-    runtime.render_root = Some(render_root);
     runtime.root_kind = Some(RootKind::Ui);
 }
 
@@ -906,27 +948,38 @@ fn rebuild_world_render_tree(
     runtime: &mut TextAnimationRuntime,
     commands: &mut Commands,
 ) {
-    if let Some(render_root) = runtime.render_root.take() {
-        commands.entity(render_root).despawn_children();
-        commands.entity(render_root).despawn();
+    let render_root = match runtime.render_root {
+        Some(root) => root,
+        None => {
+            let root = commands
+                .spawn((
+                    Name::new("Text Animation World Overlay"),
+                    TextAnimationRenderRoot,
+                    Transform::default(),
+                    Visibility::Visible,
+                ))
+                .id();
+            commands.entity(root_entity).add_child(root);
+            runtime.render_root = Some(root);
+            root
+        }
+    };
+
+    let current_count = runtime.glyph_entities.len();
+
+    // Despawn excess entities (only when we have more than needed)
+    if glyph_count < current_count {
+        for entity in runtime.glyph_entities.drain(glyph_count..) {
+            commands.entity(entity).despawn();
+        }
     }
 
-    let render_root = commands
-        .spawn((
-            Name::new("Text Animation World Overlay"),
-            TextAnimationRenderRoot,
-            Transform::default(),
-            Visibility::Visible,
-        ))
-        .id();
-    commands.entity(root_entity).add_child(render_root);
-
-    runtime.glyph_entities.clear();
-    for glyph_index in 0..glyph_count {
+    // Spawn missing entities
+    for glyph_index in current_count.min(glyph_count)..glyph_count {
         let glyph = commands
             .spawn((
                 Name::new(format!("Animated Glyph {glyph_index}")),
-                TextAnimationGlyph { glyph_index },
+                TextAnimationGlyph,
                 Sprite::default(),
                 Transform::default(),
             ))
@@ -934,7 +987,6 @@ fn rebuild_world_render_tree(
         commands.entity(render_root).add_child(glyph);
         runtime.glyph_entities.push(glyph);
     }
-    runtime.render_root = Some(render_root);
     runtime.root_kind = Some(RootKind::World);
 }
 

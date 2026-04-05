@@ -16,11 +16,21 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    let _root = common::spawn_base_scene(
+    let root = common::spawn_base_scene(
         &mut commands,
         "text2d_world_label",
         "World-space labels can use the same effect stack and motion accessibility rules as UI text.",
     );
+
+    commands.entity(root).with_children(|parent| {
+        parent.spawn((
+            Name::new("Instructions"),
+            Text::new("Left beacon: full motion (wave + alpha pulse). Right beacon: reduced motion (wave/shake suppressed, alpha pulse only)."),
+            common::demo_text_font(13.0),
+            TextColor(Color::srgb(0.55, 0.6, 0.7)),
+            TextLayout::new_with_linebreak(bevy::text::LineBreak::WordBoundary),
+        ));
+    });
 
     commands.spawn((
         Name::new("Warning Beacon"),
