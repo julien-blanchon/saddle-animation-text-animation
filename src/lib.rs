@@ -124,12 +124,8 @@ impl Plugin for TextAnimationPlugin {
             .add_systems(
                 self.update_schedule,
                 (
-                    systems::initialize_new_animations
-                        .in_set(TextAnimationSystems::DetectChanges),
-                    (
-                        systems::apply_markup_sources,
-                        systems::detect_changes,
-                    )
+                    systems::initialize_new_animations.in_set(TextAnimationSystems::DetectChanges),
+                    (systems::apply_markup_sources, systems::detect_changes)
                         .in_set(TextAnimationSystems::DetectChanges)
                         .after(systems::initialize_new_animations),
                     systems::apply_commands.in_set(TextAnimationSystems::Advance),
