@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use saddle_animation_text_animation::TextAnimationAction;
-use saddle_bevy_e2e::{action::Action, actions::assertions, scenario::Scenario};
+use saddle_bevy_e2e::{action::Action, actions::{assertions, inspect}, scenario::Scenario};
 
 use crate::{LabDiagnostics, send_command_to_named, set_reduced_motion};
 
@@ -11,6 +11,7 @@ pub fn list_scenarios() -> Vec<&'static str> {
         "layered_effects_showcase",
         "reduced_motion_showcase",
         "unicode_showcase",
+        "text2d_world_label_showcase",
         "stress_showcase",
     ]
 }
@@ -22,6 +23,7 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
         "layered_effects_showcase" => Some(layered_effects_showcase()),
         "reduced_motion_showcase" => Some(reduced_motion_showcase()),
         "unicode_showcase" => Some(unicode_showcase()),
+        "text2d_world_label_showcase" => Some(text2d_world_label_showcase()),
         "stress_showcase" => Some(stress_showcase()),
         _ => None,
     }
@@ -150,6 +152,35 @@ fn unicode_showcase() -> Scenario {
         .then(Action::Screenshot("unicode_done".into()))
         .then(Action::WaitFrames(1))
         .then(assertions::log_summary("unicode_showcase"))
+        .build()
+}
+
+fn text2d_world_label_showcase() -> Scenario {
+    Scenario::builder("text2d_world_label_showcase")
+        .description("Verify the world-space Text2d label stays visible while the scene animates, then capture the label against the beacon from two checkpoints.")
+        .then(Action::WaitUntil {
+            label: "world label becomes visible".into(),
+            condition: Box::new(|world: &World| {
+                world.resource::<LabDiagnostics>().world_visible_graphemes > 0
+            }),
+            max_frames: 120,
+        })
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "world-space label is visible",
+            |diagnostics| diagnostics.world_visible_graphemes > 0,
+        ))
+        .then(inspect::log_resource::<LabDiagnostics>(
+            "text2d_world_label_diagnostics",
+        ))
+        .then(Action::Screenshot("text2d_world_label_start".into()))
+        .then(Action::WaitFrames(36))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "world-space label remains visible",
+            |diagnostics| diagnostics.world_visible_graphemes > 0,
+        ))
+        .then(Action::Screenshot("text2d_world_label_settled".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("text2d_world_label_showcase"))
         .build()
 }
 
